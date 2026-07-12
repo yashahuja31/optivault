@@ -31,7 +31,7 @@ def run_analysis(db: Session, account_id: str) -> tuple[OptimizationReport, dict
         f"Scanned {result['total_files']} files, currently ~"
         f"${result['current_monthly_cost_usd']}/month. "
         f"Found {result['duplicate_files']} duplicate files and "
-        f"{result['stale_files'] + result['wrong_tier_files']} archive candidates. "
+        f"{result['archive_candidates']} archive candidates. "
         f"Estimated savings: ${result['estimated_monthly_savings_usd']}/month."
     )
 

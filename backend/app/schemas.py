@@ -66,6 +66,7 @@ class AnalysisResultOut(BaseModel):
     duplicate_waste_usd: float
     stale_files: int
     wrong_tier_files: int
+    archive_candidates: int
     archive_savings_usd: float
     compression_candidates: int
 

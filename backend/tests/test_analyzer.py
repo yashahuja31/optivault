@@ -76,10 +76,27 @@ def test_estimate_monthly_savings_end_to_end():
     assert result["total_files"] == 3
     assert result["duplicate_files"] == 1
     assert result["stale_files"] == 1
+    assert result["archive_candidates"] == 1
     assert result["estimated_monthly_savings_usd"] > 0
     # dup2 (the newer copy) is the one flagged, not dup1
     assert result["flagged_keys"]["duplicate"] == ["dup2.bin"]
     assert result["flagged_keys"]["archive_candidate"] == ["stale.bin"]
+
+
+def test_archive_candidates_does_not_double_count_stale_and_wrong_tier_overlap():
+    # A file that is BOTH stale (>90 days) AND wrong-tier (big, old, Standard)
+    # must only be counted once in archive_candidates -- this is the bug
+    # that was previously inflating the summary text ("9 archive candidates"
+    # out of 8 total files).
+    files = [
+        make_file("big-old.bin", size_bytes=200 * 1024 * 1024, days_old=200,
+                   etag="unique1", storage_class="STANDARD"),
+    ]
+    result = estimate_monthly_savings(files, now=NOW)
+
+    assert result["stale_files"] == 1
+    assert result["wrong_tier_files"] == 1
+    assert result["archive_candidates"] == 1  # not 2
 
 
 def test_estimate_monthly_savings_handles_empty_bucket():

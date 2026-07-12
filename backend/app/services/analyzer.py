@@ -100,6 +100,10 @@ def estimate_monthly_savings(files: list[dict], now: datetime = None) -> dict:
         "duplicate_waste_usd": round(duplicate_waste, 4),
         "stale_files": len(stale),
         "wrong_tier_files": len(wrong_tier),
+        # stale_files and wrong_tier_files overlap (a file can be both), so
+        # this is the deduplicated count -- the number that's actually safe
+        # to show as "N files flagged for archival."
+        "archive_candidates": len(archive_candidate_keys),
         "archive_savings_usd": round(archive_savings, 4),
         "compression_candidates": len(compressible),
         "flagged_keys": {
