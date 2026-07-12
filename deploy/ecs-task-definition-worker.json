@@ -1,0 +1,37 @@
+{
+  "family": "optivault-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/optivault-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/optivault-worker-task-role",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/optivault-worker:<IMAGE_TAG>",
+      "environment": [
+        { "name": "ENVIRONMENT", "value": "production" },
+        { "name": "AWS_DEFAULT_REGION", "value": "<REGION>" }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:optivault/database-url"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:optivault/redis-url"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/optivault-worker",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "worker"
+        }
+      }
+    }
+  ]
+}
