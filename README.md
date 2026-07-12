@@ -7,19 +7,22 @@ executes. Never reads or stores file contents — only metadata.
 
 ## Status
 
-This is the Week 1 milestone: Scanner is live and tested. Analyzer,
-Optimizer, and the frontend dashboard are the next iterations (see Roadmap).
+Backend: Scanner, Analyzer, and Optimizer-adjacent reporting are live and
+tested. Frontend: auth + dashboard are live and wired to the real API.
+Payments (Razorpay) and Google OAuth are scaffolded but need your own
+free test credentials before they can go further (see Roadmap).
 
 ## Architecture
 
 ```
-React/Next.js dashboard
+Next.js dashboard (this repo: /frontend)
         │
         ▼
-FastAPI backend  ──►  PostgreSQL (users, accounts, file metadata, manifests)
+FastAPI backend  ──►  PostgreSQL (users, accounts, file metadata, reports)
         │
         ▼
 Celery + Redis   ──►  Scanner (boto3, paginated, metadata-only)
+                       Analyzer (duplicate/stale/wrong-tier detection, pure Python, unit tested)
 ```
 
 Full request-level detail is in the original architecture doc; this repo
@@ -29,71 +32,57 @@ constraint yet at pre-launch scale.
 
 ## Running locally
 
+**Backend:**
 ```bash
 cp .env.example .env          # then edit SECRET_KEY at minimum
 docker compose up --build
+cd backend && alembic revision --autogenerate -m "init" && alembic upgrade head
 ```
+- API: http://localhost:8000/docs
 
-- API: http://localhost:8000/docs (FastAPI auto-generated Swagger UI)
-- Postgres: localhost:5432
-- Redis: localhost:6379
+**Frontend:**
+```bash
+cd frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
+- App: http://localhost:3000
 
-First time only, once the containers are up:
+## Try it without an AWS account
 
 ```bash
-cd backend
-alembic revision --autogenerate -m "init"
-alembic upgrade head
+docker compose exec api python -m app.scripts.seed_test_data you@example.com
 ```
-
-(`docker compose up` also runs `create_all()` as a local-only convenience,
-so the app works even before you've run migrations — but Alembic is the
-real source of truth for schema changes from here on.)
-
-## Try the scan flow end to end
-
-```bash
-# 1. Sign up
-curl -X POST localhost:8000/auth/signup -d '{"email":"you@example.com","password":"..."}' -H 'Content-Type: application/json'
-
-# 2. Log in, grab the access_token
-curl -X POST localhost:8000/auth/login -d 'username=you@example.com&password=...'
-
-# 3. Connect a bucket (needs real AWS creds available to the worker container,
-#    or a role_arn if you've set up cross-account access)
-curl -X POST localhost:8000/cloud-accounts -H "Authorization: Bearer <token>" \
-     -d '{"bucket_name": "your-test-bucket"}' -H 'Content-Type: application/json'
-
-# 4. Kick off a scan
-curl -X POST localhost:8000/cloud-accounts/<id>/scan -H "Authorization: Bearer <token>"
-
-# 5. Poll status, then list results
-curl localhost:8000/cloud-accounts/<id>/scan-status -H "Authorization: Bearer <token>"
-curl localhost:8000/cloud-accounts/<id>/files -H "Authorization: Bearer <token>"
-```
+Seeds a fake bucket with duplicates, stale files, and wrong-tier files
+directly into Postgres — sign up with that email first via the frontend
+or `/docs`, then hit Scan → Analyze on the dashboard.
 
 ## Tests
 
 ```bash
 cd backend
-pip install -r requirements.txt
-pytest tests/ -v
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pytest tests/ -v
 ```
-
-The scanner tests use `moto` to mock S3, so they run with no real AWS
-account or credentials — this is also what CI runs on every push.
+The scanner tests mock S3 via `moto`; the analyzer tests are pure Python
+with no external dependency at all. Both run in CI on every push.
 
 ## Roadmap
 
 - [x] Scanner: paginated S3 metadata indexing, tested against mocked S3
+- [x] Analyzer: duplicate/stale/wrong-tier detection with real AWS pricing, unit tested
 - [x] Auth, cloud account management, scan job tracking
 - [x] Local dev environment (Docker Compose), CI (lint + test), ECS/Fargate deploy scaffolding
-- [ ] Analyzer: duplicate grouping, stale-data detection, tier-mismatch detection, cost estimate
+- [x] Frontend dashboard (Next.js) — signup/login, connect bucket, scan, analyze, waste breakdown
 - [ ] Optimizer: manifest generation, dry-run preview, execute (move/delete/compress)
+- [ ] Google OAuth — code path ready, needs a free Google Cloud OAuth client ID from you
+- [ ] Razorpay checkout — needs a free Razorpay test-mode account from you (no KYC required for test mode)
+- [ ] Deploy frontend to Vercel (no blocker, can do anytime)
+- [ ] Deploy backend per `deploy/README.md` (needs an AWS account first)
 - [ ] Predictor: simple ML model for access-likelihood scoring
-- [ ] Frontend dashboard (Next.js)
-- [ ] Terraform for the AWS resources described in `deploy/README.md`
-- [ ] Real cross-account IAM role flow (currently supports it in code, untested against a real second account)
 
 ## Why these particular tradeoffs
 
@@ -112,3 +101,9 @@ interviewer or a technical cofounder will actually ask:
   production logs" is the single fastest way to lose a customer's trust —
   the entire product only works if people trust it enough to grant it
   write access at all.
+- **Why is the Analyzer pure functions instead of DB queries directly?**
+  It means the detection rules (what counts as a duplicate, what counts
+  as stale) can be unit tested with plain Python dicts in milliseconds,
+  with zero database or AWS dependency — which is also how a real bug
+  (double-counted archive candidates from overlapping stale/wrong-tier
+  sets) got caught with a regression test instead of shipping silently.
