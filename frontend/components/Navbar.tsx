@@ -1,15 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getToken, clearToken } from "@/lib/api";
+import { useAuth0 } from "@auth0/auth0-react";
 
 export default function Navbar() {
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setLoggedIn(!!getToken());
-  }, []);
+  const { isAuthenticated, isLoading, loginWithRedirect, logout } = useAuth0();
 
   return (
     <nav className="flex items-center justify-between px-6 py-5 md:px-12 border-b border-border">
@@ -20,16 +15,15 @@ export default function Navbar() {
         <Link href="/pricing" className="hover:text-text transition-colors">
           Pricing
         </Link>
-        {loggedIn ? (
+        {isLoading ? null : isAuthenticated ? (
           <>
             <Link href="/dashboard" className="hover:text-text transition-colors">
               Dashboard
             </Link>
             <button
-              onClick={() => {
-                clearToken();
-                window.location.href = "/";
-              }}
+              onClick={() =>
+                logout({ logoutParams: { returnTo: window.location.origin } })
+              }
               className="hover:text-text transition-colors"
             >
               Log out
@@ -37,15 +31,22 @@ export default function Navbar() {
           </>
         ) : (
           <>
-            <Link href="/login" className="hover:text-text transition-colors">
+            <button
+              onClick={() => loginWithRedirect()}
+              className="hover:text-text transition-colors"
+            >
               Log in
-            </Link>
-            <Link
-              href="/signup"
+            </button>
+            <button
+              onClick={() =>
+                loginWithRedirect({
+                  authorizationParams: { screen_hint: "signup" },
+                })
+              }
               className="bg-savings text-ink px-4 py-2 rounded-md font-medium hover:opacity-90 transition-opacity"
             >
               Sign up
-            </Link>
+            </button>
           </>
         )}
       </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
+import Auth0Wrapper from "@/components/Auth0Wrapper";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -26,7 +27,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="bg-ink text-text font-body antialiased">{children}</body>
+      <body className="bg-ink text-text font-body antialiased">
+        <Auth0Wrapper>{children}</Auth0Wrapper>
+      </body>
     </html>
   );
 }

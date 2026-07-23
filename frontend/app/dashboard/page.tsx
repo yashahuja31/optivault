@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useAuth0 } from "@auth0/auth0-react";
 import Navbar from "@/components/Navbar";
 import WasteBreakdownBar from "@/components/WasteBreakdownBar";
 import {
-  getToken,
   listAccounts,
   createAccount,
   startScan,
@@ -19,30 +18,34 @@ import {
 } from "@/lib/api";
 
 export default function DashboardPage() {
-  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, loginWithRedirect, getAccessTokenSilently } =
+    useAuth0();
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [newBucket, setNewBucket] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!getToken()) {
-      router.push("/login");
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      loginWithRedirect();
       return;
     }
-    listAccounts()
+    getAccessTokenSilently()
+      .then((token) => listAccounts(token))
       .then(setAccounts)
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [authLoading, isAuthenticated, loginWithRedirect, getAccessTokenSilently]);
 
   async function handleAddAccount(e: React.FormEvent) {
     e.preventDefault();
     if (!newBucket.trim()) return;
-    const account = await createAccount(newBucket.trim());
+    const token = await getAccessTokenSilently();
+    const account = await createAccount(token, newBucket.trim());
     setAccounts((prev) => [...prev, account]);
     setNewBucket("");
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <main>
         <Navbar />
@@ -89,6 +92,7 @@ export default function DashboardPage() {
 }
 
 function AccountCard({ account }: { account: CloudAccount }) {
+  const { getAccessTokenSilently } = useAuth0();
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [report, setReport] = useState<OptimizationReportOut | null>(null);
@@ -97,18 +101,20 @@ function AccountCard({ account }: { account: CloudAccount }) {
 
   const pollScan = useCallback(async () => {
     for (let i = 0; i < 30; i++) {
-      const job = await getScanStatus(account.id);
+      const token = await getAccessTokenSilently();
+      const job = await getScanStatus(token, account.id);
       setScanJob(job);
       if (job.status === "completed" || job.status === "failed") break;
       await new Promise((r) => setTimeout(r, 1500));
     }
-  }, [account.id]);
+  }, [account.id, getAccessTokenSilently]);
 
   async function handleScan() {
     setError(null);
     setBusy("scan");
     try {
-      const job = await startScan(account.id);
+      const token = await getAccessTokenSilently();
+      const job = await startScan(token, account.id);
       setScanJob(job);
       await pollScan();
     } catch (err) {
@@ -122,9 +128,10 @@ function AccountCard({ account }: { account: CloudAccount }) {
     setError(null);
     setBusy("analyze");
     try {
-      const analysisResult = await analyzeAccount(account.id);
+      const token = await getAccessTokenSilently();
+      const analysisResult = await analyzeAccount(token, account.id);
       setResult(analysisResult);
-      setReport(await getReport(account.id));
+      setReport(await getReport(token, account.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed. Run a scan first.");
     } finally {
