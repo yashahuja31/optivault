@@ -1,33 +1,46 @@
-from datetime import datetime, timedelta
-from typing import Optional
+"""Auth0 access-token verification.
 
-from jose import jwt, JWTError
-from passlib.context import CryptContext
+Tokens are RS256-signed by Auth0. We fetch the tenant's public signing keys
+(JWKS) once and cache them in-process, then verify each incoming token's
+signature, audience, and issuer with PyJWT.
+"""
+from functools import lru_cache
+
+import jwt
+from jwt import PyJWKClient
 
 from app.config import settings
 
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
+class AuthError(Exception):
+    """Raised when a token is missing, malformed, or fails verification."""
 
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+@lru_cache(maxsize=1)
+def _jwk_client() -> PyJWKClient:
+    if not settings.auth0_domain:
+        raise AuthError("AUTH0_DOMAIN is not configured")
+    jwks_url = f"https://{settings.auth0_domain}/.well-known/jwks.json"
+    return PyJWKClient(jwks_url)
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+def verify_auth0_token(token: str) -> dict:
+    """Validate an Auth0 access token and return its decoded claims.
 
+    Raises AuthError on any failure (bad signature, wrong audience/issuer,
+    expired, or malformed token).
+    """
+    if not settings.auth0_audience:
+        raise AuthError("AUTH0_AUDIENCE is not configured")
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
-    expire = datetime.utcnow() + (
-        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
-    )
-    payload = {"sub": subject, "exp": expire}
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
-
-
-def decode_access_token(token: str) -> Optional[str]:
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-        return payload.get("sub")
-    except JWTError:
-        return None
+        signing_key = _jwk_client().get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=settings.auth0_algorithms,
+            audience=settings.auth0_audience,
+            issuer=f"https://{settings.auth0_domain}/",
+        )
+    except jwt.PyJWTError as exc:
+        raise AuthError(str(exc)) from exc

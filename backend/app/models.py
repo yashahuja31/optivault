@@ -18,8 +18,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    auth0_sub = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
-    password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     cloud_accounts = relationship("CloudAccount", back_populates="owner")

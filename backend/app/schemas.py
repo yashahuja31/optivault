@@ -1,17 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr
-
-
-# --- Auth ---
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+from pydantic import BaseModel
 
 
 # --- Cloud Account ---

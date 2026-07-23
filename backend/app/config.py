@@ -11,10 +11,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://optivault:optivault@localhost:5432/optivault"
     redis_url: str = "redis://localhost:6379/0"
 
-    # Auth
-    secret_key: str = "CHANGE_ME_IN_PRODUCTION"
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24  # 24h
+    # Auth (Auth0)
+    # auth0_domain: your tenant domain, e.g. "dev-xxxx.us.auth0.com" (no scheme)
+    # auth0_audience: the Identifier of the Auth0 API you created
+    auth0_domain: str = ""
+    auth0_audience: str = ""
+    auth0_algorithms: list[str] = ["RS256"]
 
     # AWS (only used for demo/local scanning against a real bucket;
     # in production, per-customer credentials come from Cloud_Account rows)

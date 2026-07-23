@@ -1,8 +1,9 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, cloud_accounts
+from app.routers import cloud_accounts
 
 app = FastAPI(
     title="OptiVault API",
@@ -10,7 +11,15 @@ app = FastAPI(
     version="0.1.0",
 )
 
-app.include_router(auth.router)
+# The Next.js frontend calls this API cross-origin (localhost:3000 -> :8000).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(cloud_accounts.router)
 
 
