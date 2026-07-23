@@ -62,10 +62,8 @@ or `/docs`, then hit Scan → Analyze on the dashboard.
 
 ```bash
 cd backend
-py -3.12 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pytest tests/ -v
+pip install -r requirements.txt
+pytest tests/ -v
 ```
 The scanner tests mock S3 via `moto`; the analyzer tests are pure Python
 with no external dependency at all. Both run in CI on every push.
